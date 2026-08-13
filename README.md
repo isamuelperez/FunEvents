@@ -1,5 +1,24 @@
 # FunEvents
 
+## Requerimientos Funcionales
+
+- 1er Punto.
+Describir la arquitectura general de un sistema de venta de entradas para una empresa ficticia FunEvents que
+organiza eventos de entretenimiento (conciertos, teatro, etc.)El sistema debe gestionar la venta de entradas
+de distintos canales. El canal principal es la venta online a través del portal de la empresa, pero también se
+pueden vender entradas desde las oficinas de atención al cliente existentes por todo el mundo y desde
+portales u oficinas de colaboradores. Habitualmente estos colaboradores quieren personalizar la experiencia
+de los compradores integrando el sistema de FunEvents con su propio portal o aplicación de punto de venta.
+
+- 2do Punto.
+Implementar un prototipo mínimo de un cliente de consola para pruebas que realiza la reserva de entradas
+para un evento a partir de un código de evento y de usuario ya conocidos. Esta reserva debe realizarse a través
+de un api web que también debe implementar el candidato.
+
+- Tecnologías a usar : Para el prototipo se valorará usar una versión moderna de .NET (netcore 8 o superior) y
+ASP.NET Core Minimal APIs. Si se considera necesario, usar Postgres como base de datos y .NET Aspire como
+orquestador.
+
 Prototipo de un sistema de gestión y reserva de entradas para **FunEvents**, empresa ficticia dedicada a organizar eventos de entretenimiento como conciertos, teatro y otros espectáculos.
 
 ## 1. Descripción
@@ -9,7 +28,7 @@ FunEvents debe permitir gestionar la venta/reserva de entradas desde diferentes 
 - Portal web de FunEvents.
 - Oficinas de atención al cliente.
 - Portales de colaboradores.
-- Aplicaciones/POS de colaboradores.
+- Aplicaciones/Puntos de colaboradores.
 
 La arquitectura centraliza las reglas de negocio en una API de FunEvents para que los distintos canales consuman los mismos servicios sin acceder directamente a la base de datos.
 
@@ -63,6 +82,8 @@ Contiene los casos de uso de la aplicación:
 
 Se utiliza **CQRS** y **MediatR**.
 
+**CQRS** organiza los casos de uso como Commands y Queries, mientras que **MediatR** se encarga de enviar esos Commands/Queries hacia sus respectivos Handlers.
+
 Ejemplo:
 
 ```text
@@ -78,7 +99,7 @@ Contiene las implementaciones relacionadas con persistencia:
 
 - Entity Framework Core.
 - `FunEventsDbContext`.
-- Configuraciones de entidades.
+- Configuraciones de entidades (**Fluent API**).
 - Repositories.
 - Unit of Work.
 - Transacciones.
@@ -166,7 +187,7 @@ Actualizar evento  Crear reserva
 
 ### Paso a paso
 
-1. El cliente envía código de evento, usuario y cantidad.
+1. El cliente envía código de evento, Id usuario y cantidad.
 2. La Minimal API recibe la petición.
 3. FluentValidation valida los datos.
 4. MediatR envía el `CreateReservationCommand`.
@@ -279,19 +300,185 @@ El recurso de base de datos se referencia desde la API mediante el nombre lógic
 
 ## 9. Principios y patrones
 
+La solución está diseñada aplicando principios de diseño y patrones que permiten mantener el código desacoplado, mantenible y preparado para evolucionar a medida que aumenten los canales de venta y los casos de uso de FunEvents
+
 La solución aplica:
 
 - Separation of Concerns.
+Cada componente tiene una responsabilidad específica.
+  
+  API
+ └── Maneja HTTP y endpoints
+
+Application
+ └── Coordina casos de uso
+
+Domain
+ └── Contiene entidades y reglas del negocio
+
+Infrastructure
+ └── Maneja persistencia y acceso a recursos externos
+
+ 
 - Dependency Inversion.
+Las capas internas dependen de abstracciones y no de implementaciones concretas.
+
+Application
+     │
+     ▼
+IReservationRepository
+     ▲
+     │
+Infrastructure
+     │
+     ▼
+ReservationRepository
+
+
 - Single Responsibility.
+De esta manera, un cambio en la validación no obliga a modificar el repositorio o el endpoint.
+
+CreateReservationCommand
+        ↓
+Representa la solicitud
+
+CreateReservationValidator
+        ↓
+Valida la solicitud
+
+CreateReservationHandler
+        ↓
+Ejecuta el caso de uso
+
+ReservationRepository
+        ↓
+Persiste la reserva
+
 - Clean Architecture.
+La regla principal es que las dependencias apuntan hacia el interior, evitando que el dominio dependa de tecnologías externas como Entity Framework Core o ASP.NET Core.
+
+Esto permite que la lógica del negocio permanezca independiente de la infraestructura.
+┌─────────────────────┐
+│        API          │
+├─────────────────────┤
+│    Application      │
+├─────────────────────┤
+│       Domain        │
+├─────────────────────┤
+│   Infrastructure    │
+└─────────────────────┘
+
 - CQRS.
+  Se separan las operaciones que modifican información de las operaciones que solamente consultan información.
+
+  Commands
+ ├── CreateReservationCommands
+ ├── CreateReservationHandler
+
+Queries
+ ├── GetReservationQuery
+ ├── GetReservationHandler
+
+- MediatR
+Se utiliza como mecanismo de mediación entre la API y los handlers de Application.
+
+La API no necesita conocer directamente la implementación del caso de uso:
+
+API
+ │
+ │ Send(command)
+ ▼
+MediatR
+ │
+ ▼
+CreateReservationHandler 
+
 - Repository Pattern.
+El acceso a los datos se abstrae mediante repositorios.
+
+Application
+    │
+    ▼
+IReservationRepository
+    ▲
+    │
+Infrastructure
+    │
+    ▼
+ReservationRepository
+
+Esto evita que los handlers tengan que trabajar directamente con DbContext.
+
 - Unit of Work.
+UnitOfWork permite agrupar varias operaciones relacionadas dentro de una misma operación de persistencia.
+
+Crear Reservation
+       +
+Actualizar Event
+       ↓
+   UnitOfWork
+       ↓
+ SaveChanges / Commit
+ 
 - Dependency Injection.
-- Validación de entrada.
+Las dependencias se registran mediante el contenedor de Dependency Injection de ASP.NET Core.
+
+- FluentValidation.
+Se utiliza para validar los Commands antes de ejecutar los casos de uso.
+
+  CreateReservationCommand
+          ↓
+       Validator
+          ↓
+     ┌────┴────┐
+     │         │
+   Válido    Inválido
+     │         │
+     ▼         ▼
+ Handler    400 Bad Request
+
 - Transacciones.
+La creación de una reserva implica modificar más de un dato:
+
+Event
+ └── Disminuir AvailableTickets
+
+Reservation
+ └── Crear nueva reserva
+
+Estas operaciones deben ejecutarse de manera consistente.
+
+BEGIN TRANSACTION
+       │
+       ├── Actualizar Event
+       │
+       ├── Crear Reservation
+       │
+       ├── SaveChanges
+       │
+       ▼
+     COMMIT
+     
+Si ocurre un error: ROLLBACK
+De esta manera se evita que el sistema quede en un estado inconsistente.
+  
 - Concurrencia optimista.
+
+Concurrencia optimista
+
+La entidad Event utiliza RowVersion para detectar modificaciones concurrentes.
+
+Esto es especialmente importante en un sistema de venta de entradas, donde varios usuarios pueden intentar reservar entradas del mismo evento simultáneamente.
+
+Cliente A ──────┐
+                ▼
+             Event
+                ▲
+Cliente B ──────┘
+
+El mecanismo de concurrencia permite detectar si otro proceso modificó el evento antes de guardar los cambios.
+
+Si se detecta un conflicto, la aplicación captura DbUpdateConcurrencyException y devuelve un resultado controlado en lugar de sobrescribir silenciosamente los cambios.
 
 ## 10. Arquitectura objetivo para producción
 
@@ -354,20 +541,12 @@ Para una versión productiva se podrían incorporar:
 
 - Autenticación y autorización.
 - API Gateway.
-- Rate limiting.
-- Idempotencia para reservas.
 - Integración con pagos.
 - Gestión de tickets.
 - Notificaciones.
-- Cache.
-- Mensajería/event-driven architecture.
-- Observabilidad centralizada.
 - Auditoría.
-- Escalabilidad horizontal.
-- Gestión de partners.
 - Versionado de API.
 - Pruebas unitarias e integración.
-- Estrategias adicionales para evitar sobreventa bajo alta concurrencia.
 
 ## 13. Flujo resumido
 
@@ -413,7 +592,7 @@ HTTP 201
 El objetivo del prototipo es demostrar el flujo mínimo:
 
 ```text
-Código de evento + Usuario
+Código de evento + Usuario +  cantidad
             │
             ▼
        POST /reservations
