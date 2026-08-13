@@ -326,7 +326,7 @@ Infrastructure
  
 - Dependency Inversion.
 Las capas internas dependen de abstracciones y no de implementaciones concretas.
-
+```text
 Application
      │
      ▼
@@ -337,11 +337,11 @@ Infrastructure
      │
      ▼
 ReservationRepository
-
+```
 
 - Single Responsibility.
 De esta manera, un cambio en la validación no obliga a modificar el repositorio o el endpoint.
-
+```tex
 CreateReservationCommand
         ↓
 Representa la solicitud
@@ -357,7 +357,7 @@ Ejecuta el caso de uso
 ReservationRepository
         ↓
 Persiste la reserva
-
+```
 - Clean Architecture.
 La regla principal es que las dependencias apuntan hacia el interior, evitando que el dominio dependa de tecnologías externas como Entity Framework Core o ASP.NET Core.
 
