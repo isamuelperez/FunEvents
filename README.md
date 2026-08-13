@@ -377,9 +377,9 @@ Esto permite que la lógica del negocio permanezca independiente de la infraestr
   Se separan las operaciones que modifican información de las operaciones que solamente consultan información.
   ```
   Commands
- ├── CreateReservationCommands
- ├── CreateReservationHandler
-
+   ├── CreateReservationCommands
+   ├── CreateReservationHandler
+  ```
 Queries
  ├── GetReservationQuery
  ├── GetReservationHandler
