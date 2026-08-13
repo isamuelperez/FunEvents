@@ -308,15 +308,19 @@ La solución aplica:
 Cada componente tiene una responsabilidad específica.
   
   API
+  
  └── Maneja HTTP y endpoints
 
 Application
+
  └── Coordina casos de uso
 
 Domain
+
  └── Contiene entidades y reglas del negocio
 
 Infrastructure
+
  └── Maneja persistencia y acceso a recursos externos
 
  
