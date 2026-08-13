@@ -36,7 +36,7 @@ La arquitectura centraliza las reglas de negocio en una API de FunEvents para qu
 Portal Web ───────────────┐
 Oficinas FunEvents ───────┤
 Portal colaborador ───────┤──> FunEvents API ──> Application ──> Domain
-POS colaborador ──────────┘                              │
+POS colaborador ──────────┘                             │
                                                         ▼
                                                   Infrastructure
                                                         │
@@ -467,11 +467,7 @@ Si ocurre un error: ROLLBACK
 De esta manera se evita que el sistema quede en un estado inconsistente.
   
 - Concurrencia optimista.
-
-Concurrencia optimista
-
 La entidad Event utiliza RowVersion para detectar modificaciones concurrentes.
-
 Esto es especialmente importante en un sistema de venta de entradas, donde varios usuarios pueden intentar reservar entradas del mismo evento simultáneamente.
 ```text
 Cliente A ──────┐
