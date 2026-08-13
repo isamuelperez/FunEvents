@@ -379,7 +379,7 @@ Esto permite que la lógica del negocio permanezca independiente de la infraestr
   Commands
  ├── CreateReservationCommands
  ├── CreateReservationHandler
-```
+
 Queries
  ├── GetReservationQuery
  ├── GetReservationHandler
