@@ -379,11 +379,9 @@ Esto permite que la lógica del negocio permanezca independiente de la infraestr
   Commands
    ├── CreateReservationCommands
    ├── CreateReservationHandler
-```
-```text
-Queries
- ├── GetReservationQuery
- ├── GetReservationHandler
+  Queries
+   ├── GetReservationQuery
+   ├── GetReservationHandler
 ```
 - MediatR
 Se utiliza como mecanismo de mediación entre la API y los handlers de Application.
