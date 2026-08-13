@@ -362,6 +362,7 @@ Persiste la reserva
 La regla principal es que las dependencias apuntan hacia el interior, evitando que el dominio dependa de tecnologías externas como Entity Framework Core o ASP.NET Core.
 
 Esto permite que la lógica del negocio permanezca independiente de la infraestructura.
+```text
 ┌─────────────────────┐
 │        API          │
 ├─────────────────────┤
@@ -371,10 +372,10 @@ Esto permite que la lógica del negocio permanezca independiente de la infraestr
 ├─────────────────────┤
 │   Infrastructure    │
 └─────────────────────┘
-
+```
 - CQRS.
   Se separan las operaciones que modifican información de las operaciones que solamente consultan información.
-
+  ```text
   Commands
  ├── CreateReservationCommands
  ├── CreateReservationHandler
@@ -382,12 +383,12 @@ Esto permite que la lógica del negocio permanezca independiente de la infraestr
 Queries
  ├── GetReservationQuery
  ├── GetReservationHandler
-
+```
 - MediatR
 Se utiliza como mecanismo de mediación entre la API y los handlers de Application.
 
 La API no necesita conocer directamente la implementación del caso de uso:
-
+```text
 API
  │
  │ Send(command)
@@ -396,10 +397,10 @@ MediatR
  │
  ▼
 CreateReservationHandler 
-
+```
 - Repository Pattern.
 El acceso a los datos se abstrae mediante repositorios.
-
+```text
 Application
     │
     ▼
@@ -415,7 +416,7 @@ Esto evita que los handlers tengan que trabajar directamente con DbContext.
 
 - Unit of Work.
 UnitOfWork permite agrupar varias operaciones relacionadas dentro de una misma operación de persistencia.
-
+```text
 Crear Reservation
        +
 Actualizar Event
@@ -423,13 +424,13 @@ Actualizar Event
    UnitOfWork
        ↓
  SaveChanges / Commit
- 
+ ```
 - Dependency Injection.
 Las dependencias se registran mediante el contenedor de Dependency Injection de ASP.NET Core.
 
 - FluentValidation.
 Se utiliza para validar los Commands antes de ejecutar los casos de uso.
-
+```text
   CreateReservationCommand
           ↓
        Validator
@@ -440,10 +441,10 @@ Se utiliza para validar los Commands antes de ejecutar los casos de uso.
      │         │
      ▼         ▼
  Handler    400 Bad Request
-
+```
 - Transacciones.
 La creación de una reserva implica modificar más de un dato:
-
+```text
 Event
  └── Disminuir AvailableTickets
 
@@ -462,7 +463,7 @@ BEGIN TRANSACTION
        │
        ▼
      COMMIT
-     
+```     
 Si ocurre un error: ROLLBACK
 De esta manera se evita que el sistema quede en un estado inconsistente.
   
@@ -473,13 +474,13 @@ Concurrencia optimista
 La entidad Event utiliza RowVersion para detectar modificaciones concurrentes.
 
 Esto es especialmente importante en un sistema de venta de entradas, donde varios usuarios pueden intentar reservar entradas del mismo evento simultáneamente.
-
+```text
 Cliente A ──────┐
                 ▼
              Event
                 ▲
 Cliente B ──────┘
-
+```
 El mecanismo de concurrencia permite detectar si otro proceso modificó el evento antes de guardar los cambios.
 
 Si se detecta un conflicto, la aplicación captura DbUpdateConcurrencyException y devuelve un resultado controlado en lugar de sobrescribir silenciosamente los cambios.
