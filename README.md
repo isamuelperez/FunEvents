@@ -1,87 +1,437 @@
 # FunEvents
 
-Proyecto .NET 10 para gestionar eventos divertidos (FunEvents). Esta solución contiene una aplicación de consola y otros proyectos relacionados para ejecutar, desarrollar y probar funcionalidades del sistema.
+Prototipo de un sistema de gestión y reserva de entradas para **FunEvents**, empresa ficticia dedicada a organizar eventos de entretenimiento como conciertos, teatro y otros espectáculos.
 
-## Características
+## 1. Descripción
 
-- Aplicación de consola para interactuar con la lógica de FunEvents
-- Código organizado en proyectos dentro de la solución FunEvents.slnx
+FunEvents debe permitir gestionar la venta/reserva de entradas desde diferentes canales:
 
-## Requisitos
+- Portal web de FunEvents.
+- Oficinas de atención al cliente.
+- Portales de colaboradores.
+- Aplicaciones/POS de colaboradores.
 
-- .NET 10 SDK
-- Visual Studio 2022/2026 o equivalente que soporte .NET 10
+La arquitectura centraliza las reglas de negocio en una API de FunEvents para que los distintos canales consuman los mismos servicios sin acceder directamente a la base de datos.
 
-## Instalación
+```text
+Portal Web ───────────────┐
+Oficinas FunEvents ───────┤
+Portal colaborador ───────┤──> FunEvents API ──> Application ──> Domain
+POS colaborador ──────────┘                              │
+                                                        ▼
+                                                  Infrastructure
+                                                        │
+                                                        ▼
+                                                    SQL Server
+```
 
-1. Clona el repositorio:
+## 2. Arquitectura
 
-   git clone <URL-del-repositorio>
+La solución utiliza una arquitectura basada en **Clean Architecture**, separando responsabilidades en:
 
-2. Entra en la carpeta del proyecto:
+```text
+FunEvents
+├── FunEvents.API
+├── FunEvents.Application
+├── FunEvents.Domain
+├── FunEvents.Infrastructure
+├── FunEvents.Console
+├── FunEvents.AppHost
+└── FunEvents.ServiceDefaults
+```
 
-   cd FunEvents
+### Domain
 
-3. Restaura paquetes y compila:
+Contiene el núcleo del negocio y no depende de infraestructura ni de ASP.NET Core.
 
-   dotnet restore
-   dotnet build
+Entidades principales:
 
-## Ejecutar
+- `Event`
+- `User`
+- `Reservation`
 
-Desde la carpeta de la solución o del proyecto de la aplicación de consola:
+### Application
 
-dotnet run --project FunEvents.Console
+Contiene los casos de uso de la aplicación:
 
-O abre la solución `FunEvents.slnx` en Visual Studio y ejecuta el proyecto de inicio.
+- Commands.
+- Queries.
+- Handlers.
+- Validators.
+- DTOs/Results.
+- Abstracciones de repositorios.
 
-## Estructura del repositorio
+Se utiliza **CQRS** y **MediatR**.
 
-- FunEvents.slnx  - solución principal
-- FunEvents.Console/ - proyecto de consola
-- (otros proyectos) - librerías u otros módulos relacionados
+Ejemplo:
 
-## Arquitectura y patrones de diseño
+```text
+CreateReservationCommand
+        │
+        ▼
+CreateReservationHandler
+```
 
-El proyecto sigue una arquitectura limpia separando responsabilidades entre:
+### Infrastructure
 
-- Domain: entidades y tipos del dominio (FunEvents.Domain)
-- Application: lógica de aplicación, casos de uso, comandos y consultas (CQRS) y abstractions (FunEvents.Application)
-- Infrastructure: implementación de persistencia, EF Core DbContext, repositorios y migraciones (FunEvents.Infrasctructure)
-- API / AppHost / Console: puntos de entrada y configuración de hosting (FunEvents.API, FunEvents.AppHost, FunEvents.Console)
+Contiene las implementaciones relacionadas con persistencia:
 
-Patrones y bibliotecas utilizadas:
+- Entity Framework Core.
+- `FunEventsDbContext`.
+- Configuraciones de entidades.
+- Repositories.
+- Unit of Work.
+- Transacciones.
+- Migraciones.
 
-- CQRS con MediatR: comandos y consultas manejados por handlers en la capa de Application
-- Validación con FluentValidation
-- Repositorio + Unit of Work: abstracciones en Application e implementaciones en Infrastructure
-- Inyección de dependencias mediante Microsoft.Extensions.DependencyInjection
-- Entity Framework Core para ORM y migraciones
-- Patrones operativos: OpenTelemetry, health checks y descubrimiento de servicios a través de ServiceDefaults (extensiones en FunEvents.ServiceDefaults)
+### API
 
-## Motor de base de datos
+La presentación está implementada con **ASP.NET Core Minimal APIs**.
 
-La solución está preparada para usar Microsoft SQL Server como proveedor de persistencia. Se usa Entity Framework Core con migrations incluidas (ver FunEvents.Infrasctructure/Data/Migrations) y el proyecto registra el DbContext para SQL Server en el arranque (AddSqlServerDbContext en el host/API).
+Responsabilidades:
 
-Si se desea cambiar a otro proveedor (por ejemplo PostgreSQL o SQLite) hay que ajustar la configuración del DbContext y los paquetes de EF Core en el proyecto de Infrastructure.
+- Exponer endpoints HTTP.
+- Recibir requests.
+- Enviar Commands/Queries a Application.
+- Convertir resultados en respuestas HTTP.
 
-## Contribuir
+### Console
 
-1. Crea una rama (branch):
+Cliente de consola utilizado para probar la reserva mediante HTTP.
 
-   git checkout -b feature/mi-mejora
+```text
+FunEvents.Console
+       │
+       │ HTTP
+       ▼
+FunEvents.API
+```
 
-2. Realiza cambios, añade y comete:
+### AppHost
 
-   git add .
-   git commit -m "Descripción de la mejora"
+Utiliza **.NET Aspire** para orquestar la API y SQL Server.
 
-3. Abre un pull request hacia la rama principal del repositorio.
+```text
+AppHost
+ ├── FunEvents API
+ └── SQL Server
+       └── funevents
+```
 
-## Licencia
+## 3. Flujo de una reserva
 
-Indica aquí la licencia del proyecto (por ejemplo, MIT). Si no hay licencia, especifica que se contacte al autor para permisos.
+El caso de uso principal es crear una reserva para un usuario y un evento conocidos.
 
-## Contacto
+```text
+Cliente Console / Portal / POS
+              │
+              │ POST /api/reservations
+              ▼
+       Minimal API Endpoint
+              │
+              ▼
+       FluentValidation
+              │
+              ▼
+           MediatR
+              │
+              ▼
+ CreateReservationHandler
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+ UserRepository   EventRepository
+       │             │
+       └──────┬──────┘
+              ▼
+     Verificar disponibilidad
+              │
+              ▼
+        Iniciar transacción
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+Actualizar evento  Crear reserva
+       │             │
+       └──────┬──────┘
+              ▼
+        SaveChanges
+              │
+              ▼
+           Commit
+              │
+              ▼
+       HTTP 201 Created
+```
 
-Para dudas o incidencias abre un issue en el repositorio o contacta al responsable del proyecto.
+### Paso a paso
+
+1. El cliente envía código de evento, usuario y cantidad.
+2. La Minimal API recibe la petición.
+3. FluentValidation valida los datos.
+4. MediatR envía el `CreateReservationCommand`.
+5. El handler verifica que exista el usuario.
+6. Busca el evento mediante su código.
+7. Comprueba la disponibilidad.
+8. Inicia una transacción.
+9. Reduce las entradas disponibles.
+10. Crea la reserva.
+11. Entity Framework Core persiste los cambios.
+12. Si todo funciona, hace `COMMIT`.
+13. La API devuelve `201 Created`.
+
+## 4. Concurrencia
+
+La entidad `Event` utiliza `RowVersion` para implementar **concurrencia optimista**.
+
+Esto es importante porque varios compradores pueden intentar reservar entradas del mismo evento simultáneamente.
+
+```text
+Cliente A ──────┐
+                ├──> Evento
+Cliente B ──────┘
+```
+
+El control de concurrencia permite detectar cambios realizados por otra operación y evitar actualizaciones inconsistentes.
+
+## 5. Persistencia
+
+La solución utiliza:
+
+- SQL Server.
+- Entity Framework Core.
+- Repository Pattern.
+- Unit of Work.
+- Transacciones.
+
+Relaciones principales:
+
+```text
+User 1 ─────── N Reservation N ─────── 1 Event
+```
+
+Una reserva pertenece a un usuario y a un evento.
+
+El código del evento debe ser único.
+
+## 6. Endpoint principal
+
+El prototipo expone:
+
+```http
+POST /api/reservations
+Content-Type: application/json
+```
+
+Ejemplo:
+
+```json
+{
+  "eventCode": "EVT-001",
+  "userId": "11111111-1111-1111-1111-111111111111",
+  "quantity": 2
+}
+```
+
+Respuesta esperada:
+
+```http
+201 Created
+```
+
+con los datos de la reserva creada.
+
+## 7. Cliente de consola
+
+El cliente permite probar el flujo completo sin construir un frontend:
+
+```text
+Usuario
+  │
+  ▼
+Console
+  │
+  │ HTTP POST
+  ▼
+FunEvents API
+  │
+  ▼
+SQL Server
+```
+
+## 8. .NET Aspire
+
+La arquitectura de desarrollo es:
+
+```text
+                 .NET Aspire
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+   FunEvents API            SQL Server
+          │                     │
+          └──────────┬──────────┘
+                     ▼
+                 funevents
+```
+
+El recurso de base de datos se referencia desde la API mediante el nombre lógico `funevents`.
+
+## 9. Principios y patrones
+
+La solución aplica:
+
+- Separation of Concerns.
+- Dependency Inversion.
+- Single Responsibility.
+- Clean Architecture.
+- CQRS.
+- Repository Pattern.
+- Unit of Work.
+- Dependency Injection.
+- Validación de entrada.
+- Transacciones.
+- Concurrencia optimista.
+
+## 10. Arquitectura objetivo para producción
+
+```text
+                         ┌──────────────────┐
+                         │   Portal Web     │
+                         └────────┬─────────┘
+                                  │
+┌──────────────────┐              │
+│ Oficinas físicas │──────────────┤
+└──────────────────┘              │
+                                  ▼
+┌──────────────────┐       ┌───────────────┐
+│ Portal partner   │──────>│ FunEvents API │
+└──────────────────┘       └───────┬───────┘
+                                  │
+┌──────────────────┐              │
+│ POS partner      │──────────────┤
+└──────────────────┘              │
+                                  ▼
+                         ┌─────────────────┐
+                         │ Application     │
+                         │ Domain          │
+                         │ Infrastructure │
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                            ┌───────────┐
+                            │ SQL Server│
+                            └───────────┘
+```
+
+Los colaboradores deberían consumir la API mediante HTTPS y mecanismos de autenticación/autorización apropiados, evitando acceso directo a la base de datos.
+
+## 11. Decisiones técnicas
+
+### Minimal APIs
+
+Se utilizan porque el requerimiento recomienda ASP.NET Core Minimal APIs y son adecuadas para un prototipo pequeño.
+
+### CQRS
+
+Permite separar operaciones de lectura y escritura y facilita la evolución del sistema.
+
+### Repository + Unit of Work
+
+Abstraen la persistencia y permiten agrupar operaciones que deben ejecutarse consistentemente dentro de una transacción.
+
+### SQL Server
+
+Es apropiado para datos transaccionales como usuarios, eventos y reservas, donde consistencia y transacciones son importantes.
+
+### Aspire
+
+Permite orquestar los recursos necesarios durante el desarrollo y facilita configuración y observabilidad.
+
+## 12. Mejoras futuras
+
+Para una versión productiva se podrían incorporar:
+
+- Autenticación y autorización.
+- API Gateway.
+- Rate limiting.
+- Idempotencia para reservas.
+- Integración con pagos.
+- Gestión de tickets.
+- Notificaciones.
+- Cache.
+- Mensajería/event-driven architecture.
+- Observabilidad centralizada.
+- Auditoría.
+- Escalabilidad horizontal.
+- Gestión de partners.
+- Versionado de API.
+- Pruebas unitarias e integración.
+- Estrategias adicionales para evitar sobreventa bajo alta concurrencia.
+
+## 13. Flujo resumido
+
+```text
+Console / Portal / POS
+        │
+        ▼
+Minimal API
+        │
+        ▼
+FluentValidation
+        │
+        ▼
+MediatR
+        │
+        ▼
+CreateReservationHandler
+        │
+        ├── UserRepository
+        ├── EventRepository
+        │
+        ▼
+Disponibilidad
+        │
+        ▼
+Transaction
+        │
+        ├── Actualizar Event
+        └── Crear Reservation
+        │
+        ▼
+EF Core
+        │
+        ▼
+SQL Server
+        │
+        ▼
+HTTP 201
+```
+
+## 14. Nota sobre el prototipo
+
+El objetivo del prototipo es demostrar el flujo mínimo:
+
+```text
+Código de evento + Usuario
+            │
+            ▼
+       POST /reservations
+            │
+            ▼
+       Validar solicitud
+            │
+            ▼
+     Verificar disponibilidad
+            │
+            ▼
+        Crear reserva
+            │
+            ▼
+       Persistir en BD
+            │
+            ▼
+        Confirmar reserva
+```
+
+La arquitectura permite que este mismo caso de uso sea consumido posteriormente por el portal principal de FunEvents, oficinas físicas y sistemas de colaboradores sin duplicar la lógica de negocio.
