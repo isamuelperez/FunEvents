@@ -375,11 +375,12 @@ Esto permite que la lógica del negocio permanezca independiente de la infraestr
 ```
 - CQRS.
   Se separan las operaciones que modifican información de las operaciones que solamente consultan información.
-  ```
+```text
   Commands
    ├── CreateReservationCommands
    ├── CreateReservationHandler
-  ```
+```
+```text
 Queries
  ├── GetReservationQuery
  ├── GetReservationHandler
