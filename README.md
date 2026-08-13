@@ -379,7 +379,8 @@ Esto permite que la lógica del negocio permanezca independiente de la infraestr
   Commands
  ├── CreateReservationCommands
  ├── CreateReservationHandler
-
+```
+```text
 Queries
  ├── GetReservationQuery
  ├── GetReservationHandler
@@ -411,14 +412,14 @@ Infrastructure
     │
     ▼
 ReservationRepository
-
+```
 Esto evita que los handlers tengan que trabajar directamente con DbContext.
 
 - Unit of Work.
 UnitOfWork permite agrupar varias operaciones relacionadas dentro de una misma operación de persistencia.
 ```text
 Crear Reservation
-       +
+        ↓
 Actualizar Event
        ↓
    UnitOfWork
